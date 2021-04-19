@@ -14,38 +14,24 @@
 
 package org.hyperledger.fabric.sdk;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.hyperledger.fabric.protos.peer.Query.ChaincodeInfo;
+import org.hyperledger.fabric.sdk.exception.*;
+import org.hyperledger.fabric.sdk.helper.Config;
+import org.hyperledger.fabric.sdk.helper.Utils;
+import org.hyperledger.fabric.sdk.security.CryptoSuite;
+
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.hyperledger.fabric.protos.peer.Query.ChaincodeInfo;
-import org.hyperledger.fabric.sdk.exception.CryptoException;
-import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
-import org.hyperledger.fabric.sdk.exception.NetworkConfigurationException;
-import org.hyperledger.fabric.sdk.exception.ProposalException;
-import org.hyperledger.fabric.sdk.exception.TransactionException;
-import org.hyperledger.fabric.sdk.helper.Config;
-import org.hyperledger.fabric.sdk.helper.Utils;
-import org.hyperledger.fabric.sdk.security.CryptoSuite;
 
 import static java.lang.String.format;
 import static org.hyperledger.fabric.sdk.User.userContextCheck;
@@ -139,10 +125,11 @@ public class HFClient {
      *
      * @param channelName   The name of the channel to be configured
      * @param networkConfig The network configuration to use to configure the channel
+     * @param deliverFilter Enable/Disable DeliverFiltered service to send "filtered" block
      * @return The configured channel, or null if the channel is not defined in the configuration
      * @throws InvalidArgumentException
      */
-    public Channel loadChannelFromConfig(String channelName, NetworkConfig networkConfig) throws InvalidArgumentException, NetworkConfigurationException {
+    public Channel loadChannelFromConfig(String channelName, NetworkConfig networkConfig, boolean deliverFilter) throws InvalidArgumentException, NetworkConfigurationException {
         clientCheck();
 
         // Sanity checks
@@ -160,6 +147,20 @@ public class HFClient {
 
         return networkConfig.loadChannel(this, channelName);
     }
+
+    /**
+     * Configures a channel based on information loaded from a Network Config file.
+     * Note that it is up to the caller to initialize the returned channel.
+     *
+     * @param channelName   The name of the channel to be configured
+     * @param networkConfig The network configuration to use to configure the channel
+     * @return The configured channel, or null if the channel is not defined in the configuration
+     * @throws InvalidArgumentException
+     */
+    public Channel loadChannelFromConfig(String channelName, NetworkConfig networkConfig) throws InvalidArgumentException, NetworkConfigurationException {
+        return loadChannelFromConfig(channelName, networkConfig, false);
+    }
+
 
     /**
      * newChannel - already configured channel.

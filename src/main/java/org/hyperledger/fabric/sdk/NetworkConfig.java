@@ -14,39 +14,6 @@
 
 package org.hyperledger.fabric.sdk;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Reader;
-import java.io.StringReader;
-import java.nio.charset.StandardCharsets;
-import java.security.PrivateKey;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Objects;
-import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import javax.json.Json;
-import javax.json.JsonArray;
-import javax.json.JsonObject;
-import javax.json.JsonObjectBuilder;
-import javax.json.JsonReader;
-import javax.json.JsonString;
-import javax.json.JsonValue;
-import javax.json.JsonValue.ValueType;
-
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -61,6 +28,17 @@ import org.hyperledger.fabric.sdk.identity.X509Enrollment;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
+
+import javax.json.*;
+import javax.json.JsonValue.ValueType;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.security.PrivateKey;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 import static org.hyperledger.fabric.sdk.helper.Utils.isNullOrEmpty;
@@ -471,14 +449,16 @@ public class NetworkConfig {
         return org.getPeerAdmin();
     }
 
+
     /**
      * Returns a channel configured using the details in the Network Configuration file
      *
-     * @param client      The associated client
-     * @param channelName The name of the channel
+     * @param client        The associated client
+     * @param channelName   The name of the channel
+     * @param deliverFilter Enable/Disable DeliverFiltered service to send "filtered" block
      * @return A configured Channel instance
      */
-    Channel loadChannel(HFClient client, String channelName) throws NetworkConfigurationException {
+    Channel loadChannel(HFClient client, String channelName, boolean deliverFilter) throws NetworkConfigurationException {
 
         if (logger.isTraceEnabled()) {
             logger.trace(format("NetworkConfig.loadChannel: %s", channelName));
@@ -507,6 +487,18 @@ public class NetworkConfig {
         }
 
         return reconstructChannel(client, channelName, jsonChannel);
+    }
+
+
+    /**
+     * Returns a channel configured using the details in the Network Configuration file
+     *
+     * @param client      The associated client
+     * @param channelName The name of the channel
+     * @return A configured Channel instance
+     */
+    Channel loadChannel(HFClient client, String channelName) throws NetworkConfigurationException {
+        return loadChannel(client, channelName, false);
     }
 
     // Creates Node instances representing all the orderers defined in the config file
@@ -639,8 +631,7 @@ public class NetworkConfig {
 
     }
 
-    // Reconstructs an existing channel
-    private Channel reconstructChannel(HFClient client, String channelName, JsonObject jsonChannel) throws NetworkConfigurationException {
+    private Channel reconstructChannel(HFClient client, String channelName, JsonObject jsonChannel, boolean deliverFilter) throws NetworkConfigurationException {
 
         Channel channel = null;
 
@@ -692,6 +683,10 @@ public class NetworkConfig {
                     // Set the various roles
                     PeerOptions peerOptions = PeerOptions.createPeerOptions();
 
+                    if (deliverFilter) {
+                        peerOptions.registerEventsForFilteredBlocks();
+                    }
+
                     for (PeerRole peerRole : PeerRole.values()) {
                         setPeerRole(channelName, peerOptions, jsonPeer, peerRole);
                     }
@@ -722,6 +717,11 @@ public class NetworkConfig {
         }
 
         return channel;
+    }
+
+    // Reconstructs an existing channel
+    private Channel reconstructChannel(HFClient client, String channelName, JsonObject jsonChannel) throws NetworkConfigurationException {
+        return reconstructChannel(client, channelName, jsonChannel, false);
     }
 
     private static void setPeerRole(String channelName, PeerOptions peerOptions, JsonObject jsonPeer, PeerRole role) throws NetworkConfigurationException {
