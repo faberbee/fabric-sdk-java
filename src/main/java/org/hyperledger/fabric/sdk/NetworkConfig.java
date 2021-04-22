@@ -454,11 +454,25 @@ public class NetworkConfig {
      * Returns a channel configured using the details in the Network Configuration file
      *
      * @param client        The associated client
-     * @param channelName   The name of the channel
-     * @param deliverFilter Enable/Disable DeliverFiltered service to send "filtered" block
+     * @param channelName The name of the channel
      * @return A configured Channel instance
      */
-    Channel loadChannel(HFClient client, String channelName, boolean deliverFilter) throws NetworkConfigurationException {
+    Channel loadChannel(HFClient client, String channelName) throws NetworkConfigurationException, InvalidArgumentException {
+        return loadChannel(client, channelName, networkConfigAddPeerHandlerDefault, networkConfigAddOrdererHandlerDefault);
+    }
+
+    /**
+     * Returns a channel configured using the details in the Network Configuration file
+     *
+     * @param client      The associated client
+     * @param channelName The name of the channel
+     * @return A configured Channel instance
+     */
+    Channel loadChannel(HFClient client,
+                        String channelName,
+                        NetworkConfigAddPeerHandler networkConfigAddPeerHandler,
+                        NetworkConfigAddOrdererHandler networkConfigAddOrdererHandler)
+            throws NetworkConfigurationException, InvalidArgumentException {
 
         if (logger.isTraceEnabled()) {
             logger.trace(format("NetworkConfig.loadChannel: %s", channelName));
@@ -486,19 +500,7 @@ public class NetworkConfig {
             throw new NetworkConfigurationException(format("Channel %s is already configured in the client!", channelName));
         }
 
-        return reconstructChannel(client, channelName, jsonChannel);
-    }
-
-
-    /**
-     * Returns a channel configured using the details in the Network Configuration file
-     *
-     * @param client      The associated client
-     * @param channelName The name of the channel
-     * @return A configured Channel instance
-     */
-    Channel loadChannel(HFClient client, String channelName) throws NetworkConfigurationException {
-        return loadChannel(client, channelName, false);
+        return reconstructChannel(client, channelName, jsonChannel, networkConfigAddPeerHandler, networkConfigAddOrdererHandler);
     }
 
     // Creates Node instances representing all the orderers defined in the config file
@@ -506,7 +508,7 @@ public class NetworkConfig {
 
         // Sanity check
         if (orderers != null) {
-            throw new NetworkConfigurationException("INTERNAL ERROR: orderers has already been initialized!");
+            throw new NetworkConfigurationException("INTERNAL ERROR: orderers have already been initialized!");
         }
 
         orderers = new HashMap<>();
@@ -606,7 +608,7 @@ public class NetworkConfig {
 
         // Sanity check
         if (organizations != null) {
-            throw new NetworkConfigurationException("INTERNAL ERROR: organizations has already been initialized!");
+            throw new NetworkConfigurationException("INTERNAL ERROR: organizations have already been initialized!");
         }
 
         organizations = new HashMap<>();
@@ -631,98 +633,155 @@ public class NetworkConfig {
 
     }
 
-    private Channel reconstructChannel(HFClient client, String channelName, JsonObject jsonChannel, boolean deliverFilter) throws NetworkConfigurationException {
+    // Reconstructs an existing channel
+    private Channel reconstructChannel(HFClient client,
+                                       String channelName,
+                                       JsonObject jsonChannel,
+                                       NetworkConfigAddPeerHandler networkConfigAddPeerHandler,
+                                       NetworkConfigAddOrdererHandler networkConfigAddOrdererHandler)
+            throws NetworkConfigurationException, InvalidArgumentException {
 
-        Channel channel = null;
+        Channel channel = client.newChannel(channelName);
 
-        try {
-            channel = client.newChannel(channelName);
+        // orderers is an array of orderer name strings
+        JsonArray ordererNames = getJsonValueAsArray(jsonChannel.get("orderers"));
 
-            // orderers is an array of orderer name strings
-            JsonArray ordererNames = getJsonValueAsArray(jsonChannel.get("orderers"));
-            boolean foundOrderer = false;
+        //out("Orderer names: " + (ordererNames == null ? "null" : ordererNames.toString()));
+        if (ordererNames != null) {
+            for (JsonValue jsonVal : ordererNames) {
 
-            //out("Orderer names: " + (ordererNames == null ? "null" : ordererNames.toString()));
-            if (ordererNames != null) {
-                for (JsonValue jsonVal : ordererNames) {
+                String ordererName = getJsonValueAsString(jsonVal);
 
-                    String ordererName = getJsonValueAsString(jsonVal);
-                    Orderer orderer = getOrderer(client, ordererName);
-                    if (orderer == null) {
-                        throw new NetworkConfigurationException(format("Error constructing channel %s. Orderer %s not defined in configuration", channelName, ordererName));
-                    }
-                    channel.addOrderer(orderer);
-                    foundOrderer = true;
-                }
-            }
-
-            // peers is an object containing a nested object for each peer
-            JsonObject jsonPeers = getJsonObject(jsonChannel, "peers");
-            boolean foundPeer = false;
-
-            //out("Peers: " + (peers == null ? "null" : peers.toString()));
-            if (jsonPeers != null) {
-
-                for (Entry<String, JsonValue> entry : jsonPeers.entrySet()) {
-                    String peerName = entry.getKey();
-
-                    if (logger.isTraceEnabled()) {
-                        logger.trace(format("NetworkConfig.reconstructChannel: Processing peer %s", peerName));
-                    }
-
-                    JsonObject jsonPeer = getJsonValueAsObject(entry.getValue());
-                    if (jsonPeer == null) {
-                        throw new NetworkConfigurationException(format("Error constructing channel %s. Invalid peer entry: %s", channelName, peerName));
-                    }
-
-                    Peer peer = getPeer(client, peerName);
-                    if (peer == null) {
-                        throw new NetworkConfigurationException(format("Error constructing channel %s. Peer %s not defined in configuration", channelName, peerName));
-                    }
-
-                    // Set the various roles
-                    PeerOptions peerOptions = PeerOptions.createPeerOptions();
-
-                    if (deliverFilter) {
-                        peerOptions.registerEventsForFilteredBlocks();
-                    }
-
-                    for (PeerRole peerRole : PeerRole.values()) {
-                        setPeerRole(channelName, peerOptions, jsonPeer, peerRole);
-                    }
-
-                    foundPeer = true;
-
-                    // Add the event hub associated with this peer
-                    EventHub eventHub = getEventHub(client, peerName);
-                    if (eventHub != null) {
-                        channel.addEventHub(eventHub);
-                        if (peerOptions.peerRoles == null) { // means no roles were found but there is an event hub so define all roles but eventing.
-                            peerOptions.setPeerRoles(EnumSet.of(PeerRole.ENDORSING_PEER, PeerRole.CHAINCODE_QUERY, PeerRole.LEDGER_QUERY));
-                        }
-                    }
-                    channel.addPeer(peer, peerOptions);
-
+                // Orderer orderer = getOrderer(client, ordererName);
+                Node node = orderers.get(ordererName);
+                if (null == node) {
+                    throw new NetworkConfigurationException(format("Error constructing channel %s. Orderer %s not defined in configuration", channelName, ordererName));
                 }
 
+                logger.debug(format("Channel %s, adding orderer %s, url: %s", channel.getName(), ordererName, node.url));
+                Properties nodeProps = node.properties;
+                if (null != nodeProps) {
+                    nodeProps = (Properties) nodeProps.clone();
+                }
+
+                networkConfigAddOrdererHandler.addOrderer(this, client, channel, ordererName, node.url, nodeProps);
+            }
+        }
+
+        // peers is an object containing a nested object for each peer
+        JsonObject jsonPeers = getJsonObject(jsonChannel, "peers");
+        boolean foundPeer = false;
+
+        //out("Peers: " + (peers == null ? "null" : peers.toString()));
+        if (jsonPeers != null) {
+
+            for (Entry<String, JsonValue> entry : jsonPeers.entrySet()) {
+                String peerName = entry.getKey();
+
+                if (logger.isTraceEnabled()) {
+                    logger.trace(format("NetworkConfig.reconstructChannel: Processing peer %s", peerName));
+                }
+
+                JsonObject jsonPeer = getJsonValueAsObject(entry.getValue());
+                if (jsonPeer == null) {
+                    throw new NetworkConfigurationException(format("Error constructing channel %s. Invalid peer entry: %s", channelName, peerName));
+                }
+
+                Node node = peers.get(peerName);
+                if (node == null) {
+                    throw new NetworkConfigurationException(format("Error constructing channel %s. Peer %s not defined in configuration", channelName, peerName));
+                }
+
+                // Set the various roles
+                PeerOptions peerOptions = PeerOptions.createPeerOptions();
+
+                for (PeerRole peerRole : PeerRole.values()) {
+                    setPeerRole(channelName, peerOptions, jsonPeer, peerRole);
+                }
+
+                logger.debug(format("Channel %s, adding peer %s, url: %s", channel.getName(), peerName, node.url));
+
+                Properties nodeProps = node.properties;
+                if (null != nodeProps) {
+                    nodeProps = (Properties) nodeProps.clone();
+                }
+
+                // Add the event hub associated with this peer
+                EventHub eventHub = getEventHub(client, peerName);
+                if (eventHub != null) {
+                    channel.addEventHub(eventHub);
+                    if (peerOptions.peerRoles == null) { // means no roles were found but there is an event hub so define all roles but eventing.
+                        peerOptions.setPeerRoles(EnumSet.of(PeerRole.ENDORSING_PEER, PeerRole.CHAINCODE_QUERY, PeerRole.LEDGER_QUERY));
+                    }
+                }
+                networkConfigAddPeerHandler.addPeer(this, client, channel, peerName, node.url, nodeProps, peerOptions);
+
+                foundPeer = true;
             }
 
-            if (!foundPeer) {
-                // peers is a required field
-                throw new NetworkConfigurationException(format("Error constructing channel %s. At least one peer must be specified", channelName));
-            }
+        }
 
-        } catch (InvalidArgumentException e) {
-            throw new IllegalArgumentException(e);
+        if (!foundPeer) {
+            // peers is a required field
+            throw new NetworkConfigurationException(format("Error constructing channel %s. At least one peer must be specified", channelName));
         }
 
         return channel;
     }
 
-    // Reconstructs an existing channel
-    private Channel reconstructChannel(HFClient client, String channelName, JsonObject jsonChannel) throws NetworkConfigurationException {
-        return reconstructChannel(client, channelName, jsonChannel, false);
+    /**
+     * Interface defining handler for adding peers.
+     */
+
+    public interface NetworkConfigAddPeerHandler {
+
+        /**
+         * @param networkConfig  The network configuration.
+         * @param client         The client to be used to create the peer.
+         * @param channel        The channel the peer is to be added.
+         * @param peerName       The peer's name.
+         * @param peerURL        The peers's url
+         * @param peerProperties properties that were found in the networkconfig
+         * @param peerOptions    options when adding peer to the channel.
+         * @throws NetworkConfigurationException if the configuration cannot be parsed
+         */
+        void addPeer(NetworkConfig networkConfig, HFClient client, Channel channel, String peerName, String peerURL, Properties peerProperties, PeerOptions peerOptions) throws NetworkConfigurationException;
     }
+
+    private static final NetworkConfigAddPeerHandler networkConfigAddPeerHandlerDefault = (networkConfig, client, channel, peerName, peerURL, peerProperties, peerOptions) -> {
+        try {
+            Peer peer = client.newPeer(peerName, peerURL, peerProperties);
+            channel.addPeer(peer, peerOptions);
+        } catch (Exception e) {
+            throw new NetworkConfigurationException(format("Error on creating channel %s peer %s", channel.getName(), peerName), e);
+        }
+    };
+
+    /**
+     * Interface defining handler for adding orderers.
+     */
+    public interface NetworkConfigAddOrdererHandler {
+
+        /**
+         * @param networkConfig     The network configuration.
+         * @param client            The client to be used to create the orderer.
+         * @param channel           The channel the orderer is to be added.
+         * @param ordererName       The orderer's name.
+         * @param ordererURL        The orderers's url
+         * @param ordererProperties properties that were found in the networkconfig
+         * @throws NetworkConfigurationException if the configuration cannot be parsed
+         */
+        void addOrderer(NetworkConfig networkConfig, HFClient client, Channel channel, String ordererName, String ordererURL, Properties ordererProperties) throws NetworkConfigurationException;
+    }
+
+    private static final NetworkConfigAddOrdererHandler networkConfigAddOrdererHandlerDefault = (networkConfig, client, channel, ordererName, ordererURL, ordererProperties) -> {
+        try {
+            Orderer orderer = client.newOrderer(ordererName, ordererURL, ordererProperties);
+            channel.addOrderer(orderer);
+        } catch (Exception e) {
+            throw new NetworkConfigurationException(format("Error on creating channel %s orderer %s", channel.getName(), ordererName), e);
+        }
+    };
 
     private static void setPeerRole(String channelName, PeerOptions peerOptions, JsonObject jsonPeer, PeerRole role) throws NetworkConfigurationException {
         String propName = roleNameRemap(role);
@@ -825,7 +884,6 @@ public class NetworkConfig {
                 if (certBytes != null) {
                     props.put("tlsClientCertBytes", certBytes.getBytes());
                 }
-
             }
         }
     }
