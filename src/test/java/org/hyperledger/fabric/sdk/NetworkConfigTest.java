@@ -14,23 +14,6 @@
 
 package org.hyperledger.fabric.sdk;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.EnumSet;
-import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import javax.json.Json;
-import javax.json.JsonArray;
-import javax.json.JsonArrayBuilder;
-import javax.json.JsonObject;
-import javax.json.JsonObjectBuilder;
-import javax.json.JsonValue;
-
 import io.grpc.ManagedChannelBuilder;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.NetworkConfigurationException;
@@ -42,12 +25,17 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
+import javax.json.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+
+import static java.lang.String.format;
 import static org.hyperledger.fabric.sdk.testutils.TestUtils.getField;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class NetworkConfigTest {
     private static final Path NETWORK_CONFIG_DIR = Paths.get("src", "test", "fixture", "sdkintegration", "network_configs");
@@ -413,6 +401,62 @@ public class NetworkConfigTest {
         }
 
     }
+
+    @Test
+    public void testPeerOrdererOverrideHandlers() throws Exception {
+
+        // Should be able to instantiate a new instance of "Client" with a valid path to the YAML configuration
+        File f = NETWORK_CONFIG_YAML.toFile();
+        NetworkConfig config = NetworkConfig.fromYamlFile(f);
+        //HFClient client = HFClient.loadFromConfig(f);
+        assertNotNull(config);
+
+        HFClient client = HFClient.createNewInstance();
+        client.setCryptoSuite(CryptoSuite.Factory.getCryptoSuite());
+        client.setUserContext(TestUtils.getMockUser(USER_NAME, USER_MSP_ID));
+        final Long expectedStartEvents = 10L;
+        final Long expectedStopEvents = 100L;
+        final Long expectmaxMessageSizePeer = 99999999L;
+        final Long expectmaxMessageSizeOrderer = 888888L;
+
+        Channel channel = client.loadChannelFromConfig("foo", config, (networkConfig, client1, channel1, peerName, peerURL, peerProperties, peerOptions) -> {
+            try {
+                peerProperties.put("grpc.NettyChannelBuilderOption.maxInboundMessageSize", expectmaxMessageSizePeer);
+                Peer peer = client1.newPeer(peerName, peerURL, peerProperties);
+                peerOptions.registerEventsForFilteredBlocks();
+                peerOptions.startEvents(expectedStartEvents);
+                peerOptions.stopEvents(expectedStopEvents);
+                channel1.addPeer(peer, peerOptions);
+            } catch (Exception e) {
+                throw new NetworkConfigurationException(format("Error on creating channel %s peer %s", channel1.getName(), peerName), e);
+            }
+
+        }, (networkConfig, client12, channel12, ordererName, ordererURL, ordererProperties) -> {
+
+            try {
+                ordererProperties.put("grpc.NettyChannelBuilderOption.maxInboundMessageSize", expectmaxMessageSizeOrderer);
+                Orderer orderer = client12.newOrderer(ordererName, ordererURL, ordererProperties);
+                channel12.addOrderer(orderer);
+            } catch (Exception e) {
+                throw new NetworkConfigurationException(format("Error on creating channel %s orderer %s", channel12.getName(), ordererName), e);
+            }
+        });
+
+        assertNotNull(channel);
+        for (Peer peer : channel.getPeers()) {
+            Channel.PeerOptions peersOptions = channel.getPeersOptions(peer);
+            assertNotNull(peersOptions);
+            assertTrue(peersOptions.isRegisterEventsForFilteredBlocks());
+            assertEquals(expectedStartEvents, peersOptions.startEvents);
+            assertEquals(expectedStopEvents, peersOptions.stopEvents);
+            assertEquals(expectmaxMessageSizePeer, peer.getProperties().get("grpc.NettyChannelBuilderOption.maxInboundMessageSize"));
+        }
+
+        for (Orderer orderer : channel.getOrderers()) {
+            assertEquals(expectmaxMessageSizeOrderer, orderer.getProperties().get("grpc.NettyChannelBuilderOption.maxInboundMessageSize"));
+        }
+    }
+
 
     @Test
     public void testTlsCACertsPemString() throws Exception {
