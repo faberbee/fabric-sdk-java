@@ -17,24 +17,6 @@ package org.hyperledger.fabric.sdk;
 //Allow throwing undeclared checked execeptions in mock code.
 //CHECKSTYLE.OFF: IllegalImport
 
-import java.io.File;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -59,17 +41,20 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import sun.misc.Unsafe;
 
+import java.io.File;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+
 import static org.hyperledger.fabric.sdk.Channel.PeerOptions.createPeerOptions;
-import static org.hyperledger.fabric.sdk.testutils.TestUtils.assertArrayListEquals;
-import static org.hyperledger.fabric.sdk.testutils.TestUtils.getField;
-import static org.hyperledger.fabric.sdk.testutils.TestUtils.getMockUser;
-import static org.hyperledger.fabric.sdk.testutils.TestUtils.matchesRegex;
-import static org.hyperledger.fabric.sdk.testutils.TestUtils.setField;
-import static org.hyperledger.fabric.sdk.testutils.TestUtils.tarBytesToEntryArrayList;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.hyperledger.fabric.sdk.testutils.TestUtils.*;
+import static org.junit.Assert.*;
 
 //CHECKSTYLE.ON: IllegalImport
 
@@ -232,6 +217,36 @@ public class ChannelTest {
         testChannel.initialize();
         Assert.assertTrue(testChannel.isInitialized());
     }
+
+    @Test
+    public void testChannelInitializeByDeliverFilterPeerOption() throws Exception { //test may not be doable once initialize is done
+        class MockChannel extends Channel {
+            MockChannel(String name, HFClient client) throws InvalidArgumentException {
+                super(name, client);
+            }
+
+            @Override
+            protected Map<String, MSP> parseConfigBlock(boolean force) {
+                return null;
+            }
+
+            @Override
+            protected void loadCACertificates(boolean force) {
+            }
+        }
+
+        final Channel testChannel = new MockChannel(CHANNEL_NAME, hfclient);
+        final Peer peer = hfclient.newPeer("peer_", "grpc://localhost:7051");
+
+        Channel.PeerOptions peerOptions = createPeerOptions().setPeerRoles(EnumSet.of(Peer.PeerRole.ENDORSING_PEER));
+        assertFalse(peerOptions.isRegisterEventsForFilteredBlocks());
+
+        testChannel.addPeer(peer, createPeerOptions().setPeerRoles(EnumSet.of(Peer.PeerRole.ENDORSING_PEER)));
+        assertFalse(testChannel.isInitialized());
+        testChannel.initialize();
+        Assert.assertTrue(testChannel.isInitialized());
+    }
+
 //     Allow no peers
 //    @Test
 //    public void testChannelInitializeNoPeer() {
@@ -760,6 +775,18 @@ public class ChannelTest {
         setField(channel, "client", null);
 
         channel.initialize();
+    }
+
+    @Test
+    public void testChannelInitNullClientByDeliverFilterer() throws Exception {
+
+        thrown.expect(InvalidArgumentException.class);
+        thrown.expectMessage("Can not initialize channel without a client object.");
+
+        final Channel channel = hfclient.newChannel("testChannelInitNullClient");
+        setField(channel, "client", null);
+
+        channel.initialize(true);
     }
 
     @Test

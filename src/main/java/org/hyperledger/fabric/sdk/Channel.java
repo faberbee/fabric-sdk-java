@@ -14,123 +14,46 @@
 
 package org.hyperledger.fabric.sdk;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
-import java.lang.reflect.Constructor;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Properties;
-import java.util.Random;
-import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Pattern;
-
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.StatusRuntimeException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.hyperledger.fabric.protos.common.Common.Block;
-import org.hyperledger.fabric.protos.common.Common.BlockMetadata;
-import org.hyperledger.fabric.protos.common.Common.ChannelHeader;
-import org.hyperledger.fabric.protos.common.Common.Envelope;
-import org.hyperledger.fabric.protos.common.Common.Header;
-import org.hyperledger.fabric.protos.common.Common.HeaderType;
-import org.hyperledger.fabric.protos.common.Common.LastConfig;
-import org.hyperledger.fabric.protos.common.Common.Metadata;
-import org.hyperledger.fabric.protos.common.Common.Payload;
-import org.hyperledger.fabric.protos.common.Common.Status;
+import org.hyperledger.fabric.protos.common.Common.*;
 import org.hyperledger.fabric.protos.common.Configtx;
-import org.hyperledger.fabric.protos.common.Configtx.ConfigEnvelope;
-import org.hyperledger.fabric.protos.common.Configtx.ConfigGroup;
-import org.hyperledger.fabric.protos.common.Configtx.ConfigSignature;
-import org.hyperledger.fabric.protos.common.Configtx.ConfigUpdateEnvelope;
-import org.hyperledger.fabric.protos.common.Configtx.ConfigValue;
+import org.hyperledger.fabric.protos.common.Configtx.*;
 import org.hyperledger.fabric.protos.common.Ledger;
 import org.hyperledger.fabric.protos.discovery.Protocol;
 import org.hyperledger.fabric.protos.msp.MspConfigPackage;
 import org.hyperledger.fabric.protos.orderer.Ab;
-import org.hyperledger.fabric.protos.orderer.Ab.BroadcastResponse;
-import org.hyperledger.fabric.protos.orderer.Ab.DeliverResponse;
-import org.hyperledger.fabric.protos.orderer.Ab.SeekInfo;
-import org.hyperledger.fabric.protos.orderer.Ab.SeekPosition;
-import org.hyperledger.fabric.protos.orderer.Ab.SeekSpecified;
-import org.hyperledger.fabric.protos.peer.Configuration;
-import org.hyperledger.fabric.protos.peer.ProposalPackage;
-import org.hyperledger.fabric.protos.peer.ProposalResponsePackage;
-import org.hyperledger.fabric.protos.peer.Query;
-import org.hyperledger.fabric.protos.peer.TransactionPackage;
+import org.hyperledger.fabric.protos.orderer.Ab.*;
+import org.hyperledger.fabric.protos.peer.*;
 import org.hyperledger.fabric.sdk.BlockEvent.TransactionEvent;
 import org.hyperledger.fabric.sdk.Peer.PeerRole;
 import org.hyperledger.fabric.sdk.ServiceDiscovery.SDChaindcode;
 import org.hyperledger.fabric.sdk.ServiceDiscovery.SDEndorser;
 import org.hyperledger.fabric.sdk.ServiceDiscovery.SDEndorserState;
 import org.hyperledger.fabric.sdk.ServiceDiscovery.SDNetwork;
-import org.hyperledger.fabric.sdk.exception.CryptoException;
-import org.hyperledger.fabric.sdk.exception.EventingException;
-import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
-import org.hyperledger.fabric.sdk.exception.ProposalException;
-import org.hyperledger.fabric.sdk.exception.ServiceDiscoveryException;
-import org.hyperledger.fabric.sdk.exception.TransactionEventException;
-import org.hyperledger.fabric.sdk.exception.TransactionException;
+import org.hyperledger.fabric.sdk.exception.*;
 import org.hyperledger.fabric.sdk.helper.Config;
 import org.hyperledger.fabric.sdk.helper.DiagnosticFileDumper;
 import org.hyperledger.fabric.sdk.helper.Utils;
 import org.hyperledger.fabric.sdk.security.certgen.TLSCertificateBuilder;
 import org.hyperledger.fabric.sdk.security.certgen.TLSCertificateKeyPair;
-import org.hyperledger.fabric.sdk.transaction.GetConfigBlockBuilder;
-import org.hyperledger.fabric.sdk.transaction.InstallProposalBuilder;
-import org.hyperledger.fabric.sdk.transaction.InstantiateProposalBuilder;
-import org.hyperledger.fabric.sdk.transaction.JoinPeerProposalBuilder;
-import org.hyperledger.fabric.sdk.transaction.LifecycleApproveChaincodeDefinitionForMyOrgProposalBuilder;
-import org.hyperledger.fabric.sdk.transaction.LifecycleCheckCommitReadinessBuilder;
-import org.hyperledger.fabric.sdk.transaction.LifecycleCommitChaincodeDefinitionProposalBuilder;
-import org.hyperledger.fabric.sdk.transaction.LifecycleInstallProposalBuilder;
-import org.hyperledger.fabric.sdk.transaction.LifecycleQueryChaincodeDefinitionBuilder;
-import org.hyperledger.fabric.sdk.transaction.LifecycleQueryChaincodeDefinitionsBuilder;
-import org.hyperledger.fabric.sdk.transaction.LifecycleQueryInstalledChaincodeBuilder;
-import org.hyperledger.fabric.sdk.transaction.LifecycleQueryInstalledChaincodesBuilder;
-import org.hyperledger.fabric.sdk.transaction.ProposalBuilder;
-import org.hyperledger.fabric.sdk.transaction.ProtoUtils;
-import org.hyperledger.fabric.sdk.transaction.QueryCollectionsConfigBuilder;
-import org.hyperledger.fabric.sdk.transaction.QueryInstalledChaincodesBuilder;
-import org.hyperledger.fabric.sdk.transaction.QueryInstantiatedChaincodesBuilder;
-import org.hyperledger.fabric.sdk.transaction.QueryPeerChannelsBuilder;
-import org.hyperledger.fabric.sdk.transaction.TransactionBuilder;
-import org.hyperledger.fabric.sdk.transaction.TransactionContext;
-import org.hyperledger.fabric.sdk.transaction.UpgradeProposalBuilder;
+import org.hyperledger.fabric.sdk.transaction.*;
+
+import java.io.*;
+import java.lang.reflect.Constructor;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 
 import static java.lang.String.format;
 import static org.hyperledger.fabric.sdk.Channel.PeerOptions.createPeerOptions;
@@ -1240,6 +1163,102 @@ public class Channel implements Serializable {
             logger.debug(format("Eventque started %s", "" + eventQueueThread));
 
             for (Peer peer : getEventingPeers()) {
+                peer.initiateEventing(newTransactionContext(), getPeersOptions(peer));
+            }
+
+            transactionListenerProcessorHandle = registerTransactionListenerProcessor(); //Manage transactions.
+            logger.debug(format("Channel %s registerTransactionListenerProcessor completed", name));
+
+            if (serviceDiscovery != null) {
+                chaincodeEventUpgradeListenerHandle = registerChaincodeEventListener(Pattern.compile("^lscc$"), Pattern.compile("^upgrade$"), (handle, blockEvent, chaincodeEvent) -> {
+                    logger.debug(format("Channel %s got upgrade chaincode event", name));
+                    if (!isShutdown() && isChaincodeUpgradeEvent(blockEvent.getBlockNumber())) {
+                        getExecutorService().execute(() -> serviceDiscovery.fullNetworkDiscovery(true));
+                    }
+                });
+            }
+
+            startEventQue(); //Run the event for event messages from event hubs.
+            logger.info(format("Channel %s eventThread started shutdown: %b  thread: %s ", toString(), shutdown, eventQueueThread == null ? "null" : eventQueueThread.getName()));
+
+            this.initialized = true;
+
+            logger.debug(format("Channel %s initialized", name));
+
+            return this;
+
+        } catch (Exception e) {
+            TransactionException exp = new TransactionException(e);
+            logger.error(exp.getMessage(), exp);
+            throw exp;
+        }
+
+    }
+
+    public Channel initialize(boolean deliverFilter) throws InvalidArgumentException, TransactionException {
+
+        logger.debug(format("Channel %s initialize shutdown %b", name, shutdown));
+
+        if (isInitialized()) {
+            return this;
+        }
+
+        if (shutdown) {
+            throw new InvalidArgumentException(format("Channel %s has been shutdown.", name));
+        }
+
+        if (isNullOrEmpty(name)) {
+
+            throw new InvalidArgumentException("Can not initialize channel without a valid name.");
+
+        }
+        if (client == null) {
+            throw new InvalidArgumentException("Can not initialize channel without a client object.");
+        }
+
+        userContextCheck(client.getUserContext());
+
+        if (null == sdOrdererAddition) {
+
+            setSDOrdererAddition(new SDOrdererDefaultAddition(getServiceDiscoveryProperties()));
+        }
+
+        if (null == sdPeerAddition) {
+
+            setSDPeerAddition(new SDOPeerDefaultAddition(getServiceDiscoveryProperties()));
+
+        }
+
+        if (peers.isEmpty()) {
+            logger.warn(format("Channel %s has no peers during initialization.", name));
+
+        } else {
+            try {
+                loadCACertificates(false);  // put all MSP certs into cryptoSuite if this fails here we'll try again later.
+            } catch (Exception e) {
+                logger.warn(format("Channel %s could not load peer CA certificates from any peers.", name));
+            }
+        }
+        Collection<Peer> serviceDiscoveryPeers = getServiceDiscoveryPeers();
+        if (!serviceDiscoveryPeers.isEmpty()) {
+
+            logger.trace("Starting service discovery.");
+
+            this.serviceDiscovery = new ServiceDiscovery(this, serviceDiscoveryPeers, newTransactionContext());
+            serviceDiscovery.fullNetworkDiscovery(true);
+            serviceDiscovery.run();
+            logger.trace("Completed. service discovery.");
+        }
+
+        try {
+
+            logger.debug(format("Eventque started %s", "" + eventQueueThread));
+
+            for (Peer peer : getEventingPeers()) {
+                PeerOptions peerOptions = getPeersOptions(peer);
+                if (deliverFilter) {
+                    peerOptions.registerEventsForFilteredBlocks();
+                }
                 peer.initiateEventing(newTransactionContext(), getPeersOptions(peer));
             }
 
