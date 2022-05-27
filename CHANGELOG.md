@@ -1,3 +1,58 @@
+## v2.2.14
+Thu 12 May 2022 13:41:46 BST
+
+* [7c96d5a](https://github.com/hyperledger/fabric-sdk-java/commit/7c96d5a) Address security vulnerability CVE-2022-25647 (#199) (#200)
+
+## v2.2.13
+Tue 29 Mar 2022 15:17:20 BST
+
+* [ab5f8db](https://github.com/hyperledger/fabric-sdk-java/commit/ab5f8db) upgrade opentelemetry version to 1.12.0 (#196)
+* [de6968c](https://github.com/hyperledger/fabric-sdk-java/commit/de6968c) Run vulnerability scan only in the nightly build (#195)
+
+## v2.2.12
+Mon Feb 21 09:06:33 GMT 2022
+
+* [07cc133](https://github.com/hyperledger/fabric-sdk-java/commit/07cc133) Listen to private data in the events (#190)
+* [2481e5d](https://github.com/hyperledger/fabric-sdk-java/commit/2481e5d) Update dependency versions (#187)
+
+## v2.2.11
+Tue  4 Jan 2022 13:34:24 GMT
+
+* [f22299c](https://github.com/hyperledger/fabric-sdk-java/commit/f22299c) Update dependencies (#180)
+* [a3d5112](https://github.com/hyperledger/fabric-sdk-java/commit/a3d5112) Bump log4j-core from 2.16.0 to 2.17.0
+
+## v2.2.10
+Thu 16 Dec 2021 10:03:26 GMT
+
+* [519ba09](https://github.com/hyperledger/fabric-sdk-java/commit/519ba09) Bump log4j-core from 2.15.0 to 2.16.0 (#166)
+
+## v2.2.9
+Tue 14 Dec 2021 09:02:34 GMT
+
+* [f5580d3](https://github.com/hyperledger/fabric-sdk-java/commit/f5580d3) Bump log4j-core from 2.14.0 to 2.15.0
+* [e83c506](https://github.com/hyperledger/fabric-sdk-java/commit/e83c506) Add OpenTelemetry tracing (#151)
+
+## v2.2.8
+Thu 26 Aug 2021 13:49:18 BST
+
+* [6f84e45](https://github.com/hyperledger/fabric-sdk-java/commit/6f84e45) FABJ-480: Fix maxInboundMessageSize yaml reading (#148)
+* [adf7fce](https://github.com/hyperledger/fabric-sdk-java/commit/adf7fce) Explicit dependencies in integration test chaincode
+* [85b91b8](https://github.com/hyperledger/fabric-sdk-java/commit/85b91b8) Update Chaincode Dependency (#142)
+
+## v2.2.7
+Fri 11 Jun 2021 09:48:22 BST
+
+* [043af87](https://github.com/hyperledger/fabric-sdk-java/commit/043af87) FGJ-111: Minimise explicit gRPC dependencies (#135)
+* [66aecdf](https://github.com/hyperledger/fabric-sdk-java/commit/66aecdf) Update BlockchainInfo.java (#133)
+
+## v2.2.6
+Fri 23 Apr 2021 16:02:16 BST
+
+* [6712c7a](https://github.com/hyperledger/fabric-sdk-java/commit/6712c7a) FGJ-108: Update commons-io dependency (#126)
+* [df1827a](https://github.com/hyperledger/fabric-sdk-java/commit/df1827a) Update netty-codec-http2 dependency (#120)
+* [eff4927](https://github.com/hyperledger/fabric-sdk-java/commit/eff4927) [FABJ-549] Assert fail if less (#118)
+* [389d784](https://github.com/hyperledger/fabric-sdk-java/commit/389d784) [FABJ-545] Move log4j version to 2.14.0 (#114)
+
 ## v2.2.5
 Fri 22 Jan 2021 13:04:10 GMT
 

@@ -4,7 +4,7 @@
     <groupId>org.hyperledger.fabric-sdk-java</groupId>
     <artifactId>fabric-sdk-java</artifactId>
     <packaging>jar</packaging>
-    <version>2.2.15-SNAPSHOT</version>
+    <version>2.2.14</version>
     <name>fabric-java-sdk</name>
     <description>Java SDK for Hyperledger fabric project</description>
     <url>https://www.hyperledger.org/community/projects</url>
@@ -27,16 +27,16 @@
         <url>http://github.com/hyperledger/fabric-sdk-java</url>
     </scm>
     <properties>
-        <grpc.version>1.35.0</grpc.version><!-- CURRENT_GRPC_VERSION -->
-        <protobuf.version>3.12.4</protobuf.version>
-        <bouncycastle.version>1.62</bouncycastle.version>
+        <grpc.version>1.43.2</grpc.version>
+        <protobuf.version>3.19.2</protobuf.version> <!-- Must match version used by grpc-protobuf -->
+        <bouncycastle.version>1.70</bouncycastle.version>
         <httpclient.version>4.5.13</httpclient.version>
         <javadoc.version>3.2.0</javadoc.version>
         <skipITs>true</skipITs>
         <alpn-boot-version>8.1.7.v20160121</alpn-boot-version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jacoco.version>0.8.5</jacoco.version>
-        <log4j.version>2.14.0</log4j.version>
+        <log4j.version>2.17.1</log4j.version>
         <org.hyperledger.fabric.sdktest.ITSuite>IntegrationSuite.java</org.hyperledger.fabric.sdktest.ITSuite>
         <gpg.executable>gpg</gpg.executable>
     </properties>
@@ -68,56 +68,73 @@
         </plugins>
     </reporting>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.grpc</groupId>
+                <artifactId>grpc-bom</artifactId>
+                <version>${grpc.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-bom</artifactId>
+                <version>1.12.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.opentelemetry.instrumentation</groupId>
+                <artifactId>opentelemetry-instrumentation-bom-alpha</artifactId>
+                <version>1.12.0-alpha</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>3.3.3</version>
+            <version>4.2.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>4.13.1</version>
+            <version>4.13.2</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.grpc</groupId>
-            <artifactId>grpc-netty</artifactId>
-            <version>${grpc.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.grpc</groupId>
-            <artifactId>grpc-protobuf</artifactId>
-            <version>${grpc.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.grpc</groupId>
-            <artifactId>grpc-stub</artifactId>
-            <version>${grpc.version}</version>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-tcnative-boringssl-static</artifactId>
-            <version>2.0.34.Final</version>
+            <version>2.0.47.Final</version>
         </dependency>
         <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-codec-http2</artifactId>
-            <version>4.1.60.Final</version>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty-shaded</artifactId>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/com.google.protobuf/protobuf-java -->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-protobuf</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-stub</artifactId>
+        </dependency>
+        <dependency> <!-- necessary for Java 9+ -->
+            <groupId>org.apache.tomcat</groupId>
+            <artifactId>annotations-api</artifactId>
+            <version>6.0.53</version>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
             <version>${protobuf.version}</version>
         </dependency>
-        <dependency>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java-util</artifactId>
-            <version>${protobuf.version}</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.bouncycastle/bcpkix-jdk15on -->
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcpkix-jdk15on</artifactId>
@@ -132,17 +149,17 @@
         <dependency>
             <groupId>commons-cli</groupId>
             <artifactId>commons-cli</artifactId>
-            <version>1.4</version>
+            <version>1.5.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-compress</artifactId>
-            <version>1.20</version>
+            <version>1.21</version>
         </dependency>
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
-            <version>2.6</version>
+            <version>2.11.0</version>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-core -->
@@ -178,12 +195,12 @@
         <dependency>
             <groupId>com.spotify</groupId>
             <artifactId>futures-extra</artifactId>
-            <version>4.2.0</version>
+            <version>4.3.1</version>
         </dependency>
         <dependency>
             <groupId>com.google.api</groupId>
             <artifactId>api-common</artifactId>
-            <version>1.9.0</version>
+            <version>2.1.2</version>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/org.glassfish/javax.json -->
@@ -197,7 +214,7 @@
         <dependency>
             <groupId>org.yaml</groupId>
             <artifactId>snakeyaml</artifactId>
-            <version>1.26</version>
+            <version>1.30</version>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/org.miracl.milagro.amcl/milagro-crypto-java -->
@@ -221,6 +238,39 @@
             <version>1.3.2</version>
         </dependency>
 
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk-trace</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-extension-trace-propagators</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk-extension-autoconfigure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry.instrumentation</groupId>
+            <artifactId>opentelemetry-grpc-1.6</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-proto</artifactId>
+            <version>1.7.1-alpha</version>
+        </dependency>
     </dependencies>
 
 
@@ -365,6 +415,9 @@
                     <links>
                         <link>http://docs.oracle.com/javase/8/docs/api/</link>
                     </links>
+                    <additionalJOptions>
+                        <additionalJOption>${additionalJavadocOpts}</additionalJOption>
+                    </additionalJOptions>
                 </configuration>
             </plugin>
             <plugin>
@@ -577,8 +630,6 @@
                     </archive>
                 </configuration>
             </plugin>
-
-
         </plugins>
     </build>
     <distributionManagement>
@@ -596,7 +647,16 @@
                     <plugin>
                         <groupId>org.owasp</groupId>
                         <artifactId>dependency-check-maven</artifactId>
-                        <version>5.3.2</version>
+                        <version>7.1.0</version>
+                        <configuration>
+                            <skipProvidedScope>true</skipProvidedScope>
+                            <skipTestScope>true</skipTestScope>
+                            <skipSystemScope>true</skipSystemScope>
+                            <failBuildOnCVSS>7</failBuildOnCVSS>
+                            <suppressionFiles>
+                                <suppressionFile>dependency-suppressions.xml</suppressionFile>
+                            </suppressionFiles>
+                        </configuration>
                         <executions>
                             <execution>
                                 <goals>
@@ -605,10 +665,17 @@
                             </execution>
                         </executions>
                     </plugin>
-
                 </plugins>
             </build>
-
+        </profile>
+        <profile>
+            <id>javadoc-no-module-directories</id>
+            <activation>
+                <jdk>[11,13)</jdk>
+            </activation>
+            <properties>
+                <additionalJavadocOpts>--no-module-directories</additionalJavadocOpts>
+            </properties>
         </profile>
         <profile>
             <id>release</id>
@@ -688,6 +755,9 @@
                             <links>
                                 <link>http://docs.oracle.com/javase/8/docs/api/</link>
                             </links>
+                            <additionalJOptions>
+                                <additionalJOption>${additionalJavadocOpts}</additionalJOption>
+                            </additionalJOptions>
                         </configuration>
                         <executions>
                             <execution>
