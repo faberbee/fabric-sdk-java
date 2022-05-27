@@ -50,6 +50,7 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.Collection;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -1104,95 +1105,7 @@ public class Channel implements Serializable {
      */
 
     public Channel initialize() throws InvalidArgumentException, TransactionException {
-
-        logger.debug(format("Channel %s initialize shutdown %b", name, shutdown));
-
-        if (isInitialized()) {
-            return this;
-        }
-
-        if (shutdown) {
-            throw new InvalidArgumentException(format("Channel %s has been shutdown.", name));
-        }
-
-        if (isNullOrEmpty(name)) {
-
-            throw new InvalidArgumentException("Can not initialize channel without a valid name.");
-
-        }
-        if (client == null) {
-            throw new InvalidArgumentException("Can not initialize channel without a client object.");
-        }
-
-        userContextCheck(client.getUserContext());
-
-        if (null == sdOrdererAddition) {
-
-            setSDOrdererAddition(new SDOrdererDefaultAddition(getServiceDiscoveryProperties()));
-        }
-
-        if (null == sdPeerAddition) {
-
-            setSDPeerAddition(new SDOPeerDefaultAddition(getServiceDiscoveryProperties()));
-
-        }
-
-        if (peers.isEmpty()) {
-            logger.warn(format("Channel %s has no peers during initialization.", name));
-
-        } else {
-            try {
-                loadCACertificates(false);  // put all MSP certs into cryptoSuite if this fails here we'll try again later.
-            } catch (Exception e) {
-                logger.warn(format("Channel %s could not load peer CA certificates from any peers.", name));
-            }
-        }
-        Collection<Peer> serviceDiscoveryPeers = getServiceDiscoveryPeers();
-        if (!serviceDiscoveryPeers.isEmpty()) {
-
-            logger.trace("Starting service discovery.");
-
-            this.serviceDiscovery = new ServiceDiscovery(this, serviceDiscoveryPeers, newTransactionContext());
-            serviceDiscovery.fullNetworkDiscovery(true);
-            serviceDiscovery.run();
-            logger.trace("Completed. service discovery.");
-        }
-
-        try {
-
-            logger.debug(format("Eventque started %s", "" + eventQueueThread));
-
-            for (Peer peer : getEventingPeers()) {
-                peer.initiateEventing(newTransactionContext(), getPeersOptions(peer));
-            }
-
-            transactionListenerProcessorHandle = registerTransactionListenerProcessor(); //Manage transactions.
-            logger.debug(format("Channel %s registerTransactionListenerProcessor completed", name));
-
-            if (serviceDiscovery != null) {
-                chaincodeEventUpgradeListenerHandle = registerChaincodeEventListener(Pattern.compile("^lscc$"), Pattern.compile("^upgrade$"), (handle, blockEvent, chaincodeEvent) -> {
-                    logger.debug(format("Channel %s got upgrade chaincode event", name));
-                    if (!isShutdown() && isChaincodeUpgradeEvent(blockEvent.getBlockNumber())) {
-                        getExecutorService().execute(() -> serviceDiscovery.fullNetworkDiscovery(true));
-                    }
-                });
-            }
-
-            startEventQue(); //Run the event for event messages from event hubs.
-            logger.info(format("Channel %s eventThread started shutdown: %b  thread: %s ", toString(), shutdown, eventQueueThread == null ? "null" : eventQueueThread.getName()));
-
-            this.initialized = true;
-
-            logger.debug(format("Channel %s initialized", name));
-
-            return this;
-
-        } catch (Exception e) {
-            TransactionException exp = new TransactionException(e);
-            logger.error(exp.getMessage(), exp);
-            throw exp;
-        }
-
+        return this.initialize(false);
     }
 
     public Channel initialize(boolean deliverFilter) throws InvalidArgumentException, TransactionException {
@@ -1259,7 +1172,7 @@ public class Channel implements Serializable {
                 if (deliverFilter) {
                     peerOptions.registerEventsForFilteredBlocks();
                 }
-                peer.initiateEventing(newTransactionContext(), getPeersOptions(peer));
+                peer.initiateEventing(newTransactionContext(), peerOptions);
             }
 
             transactionListenerProcessorHandle = registerTransactionListenerProcessor(); //Manage transactions.
@@ -1288,7 +1201,6 @@ public class Channel implements Serializable {
             logger.error(exp.getMessage(), exp);
             throw exp;
         }
-
     }
 
     void sdUpdate(SDNetwork sdNetwork) throws InvalidArgumentException, ServiceDiscoveryException {

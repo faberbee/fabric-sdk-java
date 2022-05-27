@@ -4,7 +4,7 @@
     <groupId>org.hyperledger.fabric-sdk-java</groupId>
     <artifactId>fabric-sdk-java</artifactId>
     <packaging>jar</packaging>
-    <version>2.2.14</version>
+    <version>2.2.15-SNAPSHOT</version>
     <name>fabric-java-sdk</name>
     <description>Java SDK for Hyperledger fabric project</description>
     <url>https://www.hyperledger.org/community/projects</url>
@@ -632,12 +632,20 @@
             </plugin>
         </plugins>
     </build>
+
     <distributionManagement>
         <snapshotRepository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <id>faberbee-snapshots</id>
+            <name>Snapshots Repository</name>
+            <url>http://nexus3-devops.172.16.2.117.nip.io/repository/faberbee-snapshots</url>
         </snapshotRepository>
+        <repository>
+            <id>faberbee-releases</id>
+            <name>Releases Repository</name>
+            <url>http://nexus3-devops.172.16.2.117.nip.io/repository/faberbee-releases</url>
+        </repository>
     </distributionManagement>
+
     <profiles>
         <profile>
             <id>owasp</id>
