@@ -20,12 +20,12 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
 import java.util.AbstractMap;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,17 +33,19 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 import javax.net.ssl.SSLException;
 
 import com.google.common.collect.ImmutableMap;
+import io.grpc.ClientInterceptor;
 import io.grpc.ManagedChannelBuilder;
-import io.grpc.netty.GrpcSslContexts;
-import io.grpc.netty.NegotiationType;
-import io.grpc.netty.NettyChannelBuilder;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.SslProvider;
+import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
+import io.grpc.netty.shaded.io.grpc.netty.NegotiationType;
+import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslProvider;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -56,6 +58,7 @@ import org.bouncycastle.crypto.Digest;
 import org.bouncycastle.crypto.digests.SHA256Digest;
 import org.hyperledger.fabric.sdk.exception.CryptoException;
 import org.hyperledger.fabric.sdk.helper.Config;
+import org.hyperledger.fabric.sdk.helper.Utils;
 import org.hyperledger.fabric.sdk.security.CryptoPrimitives;
 
 import static java.lang.String.format;
@@ -67,13 +70,15 @@ class Endpoint {
 
     private static final String SSLPROVIDER = Config.getConfig().getDefaultSSLProvider();
     private static final String SSLNEGOTIATION = Config.getConfig().getDefaultSSLNegotiationType();
+    private static final OpenTelemetry openTelemetry = Config.getConfig().getOpenTelemetry();
+    private static final GrpcTracing grpcTracing = GrpcTracing.create(openTelemetry);
 
     private final String addr;
     private final int port;
     private final String url;
     private byte[] clientTLSCertificateDigest;
     private byte[] tlsClientCertificatePEMBytes;
-    private NettyChannelBuilder channelBuilder = null;
+    private NettyChannelBuilder channelBuilder;
 
     private static final Map<String, String> CN_CACHE = Collections.synchronizedMap(new HashMap<>());
 
@@ -236,13 +241,14 @@ class Endpoint {
         }
 
         try {
+            ClientInterceptor clientInterceptor = grpcTracing.newClientInterceptor();
             if (protocol.equalsIgnoreCase("grpc")) {
-                this.channelBuilder = NettyChannelBuilder.forAddress(addr, port).negotiationType(NegotiationType.PLAINTEXT);
+                this.channelBuilder = NettyChannelBuilder.forAddress(addr, port).negotiationType(NegotiationType.PLAINTEXT).intercept(clientInterceptor);
                 addNettyBuilderProps(channelBuilder, properties);
             } else if (protocol.equalsIgnoreCase("grpcs")) {
                 if (pemBytes == null) {
                     // use root certificate
-                    this.channelBuilder = NettyChannelBuilder.forAddress(addr, port);
+                    this.channelBuilder = NettyChannelBuilder.forAddress(addr, port).intercept(clientInterceptor);
                     addNettyBuilderProps(channelBuilder, properties);
                 } else {
                     try {
@@ -348,23 +354,15 @@ class Endpoint {
 
             }
             if (null == methodName || "forAddress".equals(methodName) || "build".equals(methodName)) {
-
                 continue;
             }
 
             Object parmsArrayO = es.getValue();
-            Object[] parmsArray;
-            if (!(parmsArrayO instanceof Object[])) {
-                parmsArray = new Object[] {parmsArrayO};
-
-            } else {
-                parmsArray = (Object[]) parmsArrayO;
-            }
+            Object[] parmsArray = !(parmsArrayO instanceof Object[]) ? new Object[] {parmsArrayO} : (Object[]) parmsArrayO;
 
             Class<?>[] classParms = new Class<?>[parmsArray.length];
-            int i = -1;
-            for (Object oparm : parmsArray) {
-                ++i;
+            for (int i = 0; i < parmsArray.length; i++) {
+                Object oparm = parmsArray[i];
 
                 if (null == oparm) {
                     classParms[i] = Object.class;
@@ -375,7 +373,6 @@ class Endpoint {
                 if (null != unwrapped) {
                     classParms[i] = unwrapped;
                 } else {
-
                     Class<?> clz = oparm.getClass();
 
                     Class<?> ecz = clz.getEnclosingClass();
@@ -387,20 +384,11 @@ class Endpoint {
                 }
             }
 
-            final Method method = channelBuilder.getClass().getMethod(methodName, classParms);
-
-            method.invoke(channelBuilder, parmsArray);
+            Utils.invokeMethod(channelBuilder, methodName, classParms, parmsArray);
 
             if (logger.isTraceEnabled()) {
-                StringBuilder sb = new StringBuilder(200);
-                String sep = "";
-                for (Object p : parmsArray) {
-                    sb.append(sep).append(p + "");
-                    sep = ", ";
-
-                }
                 logger.trace(format("Endpoint with url: %s set managed channel builder method %s (%s) ", url,
-                        method, sb.toString()));
+                        methodName, Arrays.toString(parmsArray)));
 
             }
 
