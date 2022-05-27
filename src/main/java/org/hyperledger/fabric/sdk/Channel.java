@@ -6376,6 +6376,10 @@ public class Channel implements Serializable {
             return this.eventType;
         }
 
+        public boolean isRegisterEventsForFilteredBlocks() {
+            return (this.eventType == BlockInfo.Type.FILTERED_BLOCK);
+        }
+
         /**
          * Register the peer eventing services to return filtered blocks.
          *

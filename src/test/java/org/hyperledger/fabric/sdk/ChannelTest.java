@@ -239,14 +239,12 @@ public class ChannelTest {
         final Peer peer = hfclient.newPeer("peer_", "grpc://localhost:7051");
 
         Channel.PeerOptions peerOptions = createPeerOptions().setPeerRoles(EnumSet.of(Peer.PeerRole.ENDORSING_PEER));
-        assertNotSame(peerOptions.getEventType(), BlockInfo.Type.FILTERED_BLOCK);
+        assertFalse(peerOptions.isRegisterEventsForFilteredBlocks());
 
         testChannel.addPeer(peer, peerOptions);
         assertFalse(testChannel.isInitialized());
         testChannel.initialize();
         Assert.assertTrue(testChannel.isInitialized());
-
-        assertSame(peerOptions.getEventType(), BlockInfo.Type.FILTERED_BLOCK);
     }
 
 //     Allow no peers
